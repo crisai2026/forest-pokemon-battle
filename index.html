@@ -4,8 +4,334 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Forest Pokémon Battle</title>
+<style>
+  :root {
+    --leaf-deep: #1f4d2e; --leaf-mid: #2f7a45; --leaf-light: #a8d5a0;
+    --bark: #6b4423; --soil: #3d2b1a; --gold: #f4c542;
+    --team-a: #e8532a; --team-b: #2a7de8; --cream: #f5f0e1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Trebuchet MS','Comic Sans MS',sans-serif;
+    background: radial-gradient(circle at 50% 20%, #2f7a45, #1f4d2e 70%);
+    color: var(--cream); min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; padding: 16px;
+  }
+  h1 { font-size: clamp(1.5rem,5vw,2.4rem); color: var(--gold);
+       text-shadow: 2px 2px 0 var(--soil); letter-spacing: 1px; margin-bottom: 4px; text-align:center; }
+  .subtitle { font-size:0.9rem; opacity:0.85; margin-bottom:10px; text-align:center; }
+
+  /* ---- team builder ---- */
+  #builder { width: min(96vw, 560px); }
+  .budget-row { display:flex; justify-content:space-between; align-items:center;
+    background: var(--soil); border:3px solid var(--gold); border-radius:30px;
+    padding:8px 18px; margin-bottom:12px; font-weight:bold; font-size:1.05rem; }
+  .budget-a { color:#ffd0c0; } .budget-b { color:#c0dcff; }
+  .pool { display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; }
+  .card { background: var(--leaf-mid); border:2px solid var(--leaf-deep); border-radius:10px;
+    padding:8px 4px; text-align:center; cursor:pointer; transition:transform .1s; user-select:none; position:relative; }
+  .card:active { transform:scale(0.94); }
+  .card .ce { font-size:1.8rem; line-height:1; }
+  .card .cn { font-size:0.62rem; font-weight:bold; margin-top:2px; }
+  .card .cost { position:absolute; top:2px; right:5px; font-size:0.7rem; color:var(--gold); font-weight:bold; }
+  .card .stats { font-size:0.55rem; opacity:0.85; margin-top:3px; }
+  .card.picked-a { border-color:var(--team-a); box-shadow:0 0 0 2px var(--team-a); }
+  .card.picked-b { border-color:var(--team-b); box-shadow:0 0 0 2px var(--team-b); }
+  .card .badge { position:absolute; top:2px; left:5px; font-size:0.7rem; font-weight:bold; }
+  .card.disabled { opacity:0.4; cursor:not-allowed; }
+  .who-turn { text-align:center; font-size:1.1rem; font-weight:bold; margin:8px 0; }
+
+  /* ---- board ---- */
+  .turn-banner { font-size:1.15rem; font-weight:bold; padding:8px 20px; border-radius:30px;
+    margin:10px 0; background:var(--soil); border:3px solid var(--gold); }
+  .turn-a { color:#ffd0c0; } .turn-b { color:#c0dcff; }
+  #board { display:grid; grid-template-columns:repeat(6,1fr); gap:3px;
+    background:var(--bark); padding:6px; border-radius:12px;
+    width:min(94vw,480px); aspect-ratio:1; box-shadow:0 8px 24px rgba(0,0,0,0.5); }
+  .cell { background:var(--leaf-mid); border-radius:6px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; cursor:pointer; position:relative;
+    font-size:clamp(1.3rem,5.5vw,1.9rem); transition:transform .1s, box-shadow .15s; user-select:none; }
+  .cell:nth-child(odd) { background:var(--leaf-deep); }
+  .cell.selectable { box-shadow: inset 0 0 0 3px var(--gold); }
+  .cell.moveable { box-shadow: inset 0 0 0 3px #7fffb0; }
+  .cell.attackable { box-shadow: inset 0 0 0 3px #ff7f7f; }
+  .cell.selected { transform:scale(1.08); box-shadow: inset 0 0 0 4px #fff; z-index:2; }
+  .pkmn { line-height:1; }
+  .name { font-size:0.45rem; margin-top:2px; font-weight:bold; }
+  .hp-bar { position:absolute; bottom:3px; width:80%; height:5px; background:#400; border-radius:3px; overflow:hidden; }
+  .hp-fill { height:100%; background:#4dff5a; transition:width .3s; }
+  .team-a-piece .name { color:#ffd0c0; } .team-b-piece .name { color:#c0dcff; }
+  .team-a-piece { text-shadow:0 0 8px var(--team-a); } .team-b-piece { text-shadow:0 0 8px var(--team-b); }
+  #log { margin-top:12px; width:min(94vw,480px); background:rgba(0,0,0,0.35); border-radius:10px;
+    padding:10px 14px; min-height:48px; font-size:0.95rem; text-align:center; border:2px solid var(--leaf-light); }
+  .controls { margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  button { font-family:inherit; font-size:1rem; font-weight:bold; padding:10px 18px; border:none;
+    border-radius:30px; background:var(--gold); color:var(--soil); cursor:pointer; box-shadow:0 4px 0 #b8860b; }
+  button:active { transform:translateY(3px); box-shadow:0 1px 0 #b8860b; }
+  button.disabled { opacity:0.5; cursor:not-allowed; }
+  .legend { font-size:0.8rem; margin-top:10px; opacity:0.85; text-align:center; max-width:480px; }
+  .winner { font-size:1.7rem; color:var(--gold); text-shadow:2px 2px 0 var(--soil); margin:10px 0; animation:pop .5s; }
+  @keyframes pop { from{transform:scale(0.5);} to{transform:scale(1);} }
+  .hidden { display:none !important; }
+</style>
 </head>
 <body>
-<p>Uploading game…</p>
+  <h1>🌲 Forest Pokémon Battle 🌲</h1>
+
+  <!-- ============ TEAM BUILDER ============ -->
+  <div id="builder">
+    <p class="subtitle">Each team has <b>20 points</b>. Take turns picking Pokémon until you both spend your points — then battle!</p>
+    <div class="budget-row">
+      <span class="budget-a">🔴 Red: <span id="budA">20</span> pts left</span>
+      <span class="budget-b">🔵 Blue: <span id="budB">20</span> pts left</span>
+    </div>
+    <div class="who-turn" id="pickTurn">🔴 Red team, pick a Pokémon</div>
+    <div class="pool" id="pool"></div>
+    <div class="controls">
+      <button id="startBtn" class="disabled" onclick="startBattle()">Start Battle!</button>
+      <button onclick="resetBuilder()">Clear Picks</button>
+      <button id="muteBtn" onclick="toggleMute()">🔊 Sound On</button>
+    </div>
+    <p class="legend">Cheap Pokémon (bugs) let you have MORE of them. Expensive legendaries are strong but you can only afford a few. Both teams get the same 20 points, so it's always fair!</p>
+  </div>
+
+  <!-- ============ BATTLE ============ -->
+  <div id="battle" class="hidden">
+    <div id="turnBanner" class="turn-banner turn-a">🔴 Red team's turn</div>
+    <div id="board"></div>
+    <div id="log">Tap one of your Pokémon to start!</div>
+    <div class="controls">
+      <button onclick="playAgain()">🔁 Play Again (same teams)</button>
+      <button onclick="backToBuilder()">Change Teams</button>
+      <button id="muteBtn2" onclick="toggleMute()">🔊 Sound On</button>
+    </div>
+    <div class="legend">Tap your Pokémon → tap a <b style="color:#7fffb0">green</b> square to move, or a <b style="color:#ff7f7f">red</b> Pokémon next to it to attack. Knock out the whole other team to win!</div>
+  </div>
+
+<script>
+/* ---------- 8-BIT AUDIO ---------- */
+let audioCtx=null, muted=false, musicTimer=null, musicStep=0;
+function ac(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==="suspended") audioCtx.resume(); return audioCtx; }
+function beep(freq,dur,type="square",vol=0.15){ if(muted||!freq) return;
+  const c=ac(),o=c.createOscillator(),g=c.createGain(); o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(vol,c.currentTime); g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur);
+  o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+dur); }
+const SFX={
+  select:()=>beep(660,0.08,"square",0.12),
+  move:()=>{beep(440,0.08); setTimeout(()=>beep(550,0.08),70);},
+  attack:()=>{beep(200,0.05,"sawtooth",0.2); setTimeout(()=>beep(120,0.15,"sawtooth",0.2),50);},
+  faint:()=>{beep(400,0.1,"triangle"); setTimeout(()=>beep(300,0.1,"triangle"),100); setTimeout(()=>beep(180,0.25,"triangle"),200);},
+  pick:()=>beep(784,0.1,"square",0.14),
+  win:()=>{const m=[523,659,784,1047]; m.forEach((f,i)=>setTimeout(()=>beep(f,0.2,"square",0.18),i*140));}
+};
+const MELODY=[330,392,440,392,330,392,440,523,494,440,392,440,330,0,330,0,
+              349,392,440,392,349,440,523,440,392,349,330,392,440,0,392,0];
+function startMusic(){ stopMusic(); musicStep=0; musicTimer=setInterval(()=>{
+  if(!muted){ const n=MELODY[musicStep%MELODY.length]; beep(n,0.22,"triangle",0.09);
+  if(musicStep%4===0) beep(n?n/2:165,0.3,"square",0.05);} musicStep++; },260); }
+function stopMusic(){ if(musicTimer){ clearInterval(musicTimer); musicTimer=null; } }
+function toggleMute(){ muted=!muted; const t=muted?"🔇 Sound Off":"🔊 Sound On";
+  document.getElementById("muteBtn").textContent=t; document.getElementById("muteBtn2").textContent=t; if(!muted) ac(); }
+
+/* ---------- POKÉDEX (emoji, name, move, power, hp, cost) ---------- */
+const DEX={
+  // cheap bugs & starters
+  caterpie:  {e:"🐛",n:"Caterpie",  mv:1,pw:2,hp:4, cost:1},
+  weedle:    {e:"🐜",n:"Weedle",    mv:1,pw:2,hp:4, cost:1},
+  butterfree:{e:"🦋",n:"Butterfree",mv:3,pw:3,hp:5, cost:3},
+  beedrill:  {e:"🐝",n:"Beedrill",  mv:2,pw:4,hp:6, cost:3},
+  squirtle:  {e:"🐢",n:"Squirtle",  mv:1,pw:3,hp:6, cost:2},
+  charmander:{e:"🦎",n:"Charmander",mv:2,pw:3,hp:5, cost:2},
+  bulbasaur: {e:"🌱",n:"Bulbasaur", mv:1,pw:3,hp:6, cost:2},
+  pidgeot:   {e:"🦅",n:"Pidgeot",   mv:3,pw:3,hp:6, cost:3},
+  pikachu:   {e:"⚡",n:"Pikachu",   mv:2,pw:4,hp:6, cost:4},
+  blastoise: {e:"🔫",n:"Blastoise", mv:1,pw:5,hp:9, cost:5},
+  charizard: {e:"🐉",n:"Charizard", mv:2,pw:5,hp:9, cost:6},
+  venusaur:  {e:"🌺",n:"Venusaur",  mv:1,pw:5,hp:9, cost:5},
+  // legendaries
+  dragapult: {e:"👻",n:"Dragapult", mv:3,pw:6,hp:8, cost:7},
+  mewtwo:    {e:"🧬",n:"Mewtwo",    mv:3,pw:7,hp:9, cost:8},
+  giratina:  {e:"🌀",n:"Giratina",  mv:2,pw:7,hp:11,cost:8},
+  dialga:    {e:"⏳",n:"Dialga",    mv:2,pw:7,hp:11,cost:8},
+  palkia:    {e:"💠",n:"Palkia",    mv:2,pw:7,hp:11,cost:8},
+  rayquaza:  {e:"🐲",n:"Rayquaza",  mv:4,pw:7,hp:10,cost:9},
+  eternamax: {e:"🔴",n:"Eternamax", mv:1,pw:6,hp:18,cost:9},
+  arceus:    {e:"✨",n:"Arceus",    mv:3,pw:8,hp:13,cost:10},
+};
+const BUDGET=20, SIZE=6;
+const POOL_ORDER=["caterpie","weedle","squirtle","charmander","bulbasaur","butterfree",
+  "beedrill","pidgeot","pikachu","blastoise","venusaur","charizard",
+  "dragapult","mewtwo","giratina","dialga","palkia","rayquaza","eternamax","arceus"];
+
+/* ---------- TEAM BUILDER STATE ---------- */
+let budA, budB, pickTeam, teamA, teamB;
+
+function resetBuilder(){
+  budA=BUDGET; budB=BUDGET; pickTeam="A"; teamA=[]; teamB=[];
+  document.getElementById("startBtn").classList.add("disabled");
+  renderPool(); updateBudgets();
+}
+
+function updateBudgets(){
+  document.getElementById("budA").textContent=budA;
+  document.getElementById("budB").textContent=budB;
+  const pt=document.getElementById("pickTurn");
+  const aCanPick = POOL_ORDER.some(k=>DEX[k].cost<=budA);
+  const bCanPick = POOL_ORDER.some(k=>DEX[k].cost<=budB);
+  if(!aCanPick && !bCanPick){ pt.textContent="✅ Teams ready — Start Battle!"; }
+  else { pt.innerHTML = pickTeam==="A" ? "🔴 Red team, pick a Pokémon" : "🔵 Blue team, pick a Pokémon"; }
+  // enable start once both teams have at least 1 and neither can pick more (or both chose to stop is not an option, so: allow start when both have >=1)
+  const btn=document.getElementById("startBtn");
+  if(teamA.length>=1 && teamB.length>=1) btn.classList.remove("disabled");
+  else btn.classList.add("disabled");
+}
+
+function renderPool(){
+  const pool=document.getElementById("pool"); pool.innerHTML="";
+  const curBud = pickTeam==="A" ? budA : budB;
+  POOL_ORDER.forEach(k=>{
+    const d=DEX[k];
+    const card=document.createElement("div");
+    card.className="card";
+    const inA=teamA.filter(x=>x===k).length, inB=teamB.filter(x=>x===k).length;
+    if(d.cost>curBud) card.classList.add("disabled");
+    let badge="";
+    if(inA) badge+=`<span class="badge" style="color:var(--team-a)">🔴${inA>1?inA:""}</span>`;
+    if(inB) badge+=`<span class="badge" style="color:var(--team-b);left:auto;right:5px;top:16px">🔵${inB>1?inB:""}</span>`;
+    card.innerHTML=`<span class="cost">${d.cost}p</span>${badge}
+      <div class="ce">${d.e}</div><div class="cn">${d.n}</div>
+      <div class="stats">🏃${d.mv} ⚔️${d.pw} ❤️${d.hp}</div>`;
+    card.onclick=()=>pickPokemon(k);
+    pool.appendChild(card);
+  });
+}
+
+function pickPokemon(k){
+  if(!musicTimer){ ac(); startMusic(); }
+  const d=DEX[k];
+  const bud = pickTeam==="A" ? budA : budB;
+  if(d.cost>bud) return;
+  if(pickTeam==="A"){ teamA.push(k); budA-=d.cost; } else { teamB.push(k); budB-=d.cost; }
+  SFX.pick();
+  // switch to other team if they can still pick; else stay
+  const otherBud = pickTeam==="A" ? budB : budA;
+  const otherCanPick = POOL_ORDER.some(x=>DEX[x].cost<=otherBud);
+  if(otherCanPick) pickTeam = pickTeam==="A" ? "B" : "A";
+  renderPool(); updateBudgets();
+}
+
+/* ---------- BATTLE STATE ---------- */
+let board, turn, selected;
+
+function makePiece(key,team){ const d=DEX[key];
+  return {key,team,hp:d.hp,maxhp:d.hp,mv:d.mv,pw:d.pw,e:d.e,n:d.n}; }
+
+function placeTeams(){
+  board=Array.from({length:SIZE},()=>Array(SIZE).fill(null));
+  // Team A on rows 5 & 4, Team B on rows 0 & 1. Fill left-to-right, wrap.
+  const spread=(list,rows)=>{
+    let idx=0;
+    for(const row of rows){ for(let c=0;c<SIZE && idx<list.length;c++){ board[row][c]=makePiece(list[idx],row<3?"B":"A"); idx++; } }
+    return idx;
+  };
+  // place A
+  let idx=0; for(const row of [5,4]){ for(let c=0;c<SIZE && idx<teamA.length;c++){ board[row][c]=makePiece(teamA[idx],"A"); idx++; } }
+  idx=0; for(const row of [0,1]){ for(let c=0;c<SIZE && idx<teamB.length;c++){ board[row][c]=makePiece(teamB[idx],"B"); idx++; } }
+}
+
+function startBattle(){
+  if(document.getElementById("startBtn").classList.contains("disabled")) return;
+  placeTeams(); turn="A"; selected=null;
+  document.getElementById("builder").classList.add("hidden");
+  document.getElementById("battle").classList.remove("hidden");
+  const b=document.getElementById("turnBanner"); b.className="turn-banner turn-a"; b.textContent="🔴 Red team's turn";
+  setLog("Tap one of your red Pokémon to start!");
+  if(audioCtx) startMusic();
+  render();
+}
+function playAgain(){
+  placeTeams(); turn="A"; selected=null;
+  const b=document.getElementById("turnBanner"); b.className="turn-banner turn-a"; b.textContent="🔴 Red team's turn";
+  setLog("Same teams — tap one of your red Pokémon to start!");
+  if(audioCtx) startMusic();
+  render();
+}
+function backToBuilder(){
+  document.getElementById("battle").classList.add("hidden");
+  document.getElementById("builder").classList.remove("hidden");
+  resetBuilder();
+}
+
+function inBounds(r,c){ return r>=0&&r<SIZE&&c>=0&&c<SIZE; }
+function reachable(r,c,mv){ const seen={},res=[]; let f=[[r,c,0]]; seen[r+","+c]=true;
+  while(f.length){ const [cr,cc,d]=f.shift(); if(d>0) res.push([cr,cc]); if(d===mv) continue;
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>{ const nr=cr+dr,nc=cc+dc,kk=nr+","+nc;
+      if(inBounds(nr,nc)&&!seen[kk]&&!board[nr][nc]){ seen[kk]=true; f.push([nr,nc,d+1]); } }); }
+  return res; }
+function adjacentEnemies(r,c,team){ const res=[];
+  [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>{ const nr=r+dr,nc=c+dc;
+    if(inBounds(nr,nc)&&board[nr][nc]&&board[nr][nc].team!==team) res.push([nr,nc]); }); return res; }
+
+function render(){
+  const el=document.getElementById("board"); el.innerHTML="";
+  const moves=selected?reachable(selected[0],selected[1],board[selected[0]][selected[1]].mv):[];
+  const atks=selected?adjacentEnemies(selected[0],selected[1],board[selected[0]][selected[1]].team):[];
+  const moveSet=new Set(moves.map(m=>m.join(","))), atkSet=new Set(atks.map(m=>m.join(",")));
+  for(let r=0;r<SIZE;r++) for(let c=0;c<SIZE;c++){
+    const cell=document.createElement("div"); cell.className="cell";
+    const p=board[r][c], key=r+","+c;
+    if(p){ cell.classList.add(p.team==="A"?"team-a-piece":"team-b-piece");
+      cell.innerHTML=`<span class="pkmn">${p.e}</span><span class="name">${p.n}</span>
+        <div class="hp-bar"><div class="hp-fill" style="width:${p.hp/p.maxhp*100}%"></div></div>`;
+      if(!selected&&p.team===turn) cell.classList.add("selectable"); }
+    if(selected&&selected[0]===r&&selected[1]===c) cell.classList.add("selected");
+    if(moveSet.has(key)) cell.classList.add("moveable");
+    if(atkSet.has(key)) cell.classList.add("attackable");
+    cell.onclick=()=>handleClick(r,c); el.appendChild(cell);
+  }
+}
+
+function handleClick(r,c){
+  if(!musicTimer){ ac(); startMusic(); }
+  const p=board[r][c];
+  if(!selected){ if(p&&p.team===turn){ selected=[r,c]; SFX.select();
+    setLog(`${p.n} ready! Tap green to move or red to attack.`); render(); } return; }
+  const sr=selected[0],sc=selected[1],sp=board[sr][sc];
+  const moves=reachable(sr,sc,sp.mv).map(m=>m.join(","));
+  const atks=adjacentEnemies(sr,sc,sp.team).map(m=>m.join(","));
+  const key=r+","+c;
+  if(r===sr&&c===sc){ selected=null; setLog("Pick another Pokémon."); render(); return; }
+  if(p&&p.team===turn){ selected=[r,c]; SFX.select(); setLog(`${p.n} ready!`); render(); return; }
+  if(atks.includes(key)){
+    const t=board[r][c]; t.hp-=sp.pw; SFX.attack();
+    if(t.hp<=0){ setTimeout(()=>SFX.faint(),200); setLog(`💥 ${sp.n} used magic! ${t.n} fainted!`); board[r][c]=null; }
+    else setLog(`💥 ${sp.n} hit ${t.n} for ${sp.pw}! (${t.hp} HP left)`);
+    endTurn(); return;
+  }
+  if(moves.includes(key)){ board[r][c]=sp; board[sr][sc]=null; SFX.move();
+    setLog(`${sp.n} moved through the forest.`); endTurn(); return; }
+  setLog("Can't do that — tap a green square or red enemy.");
+}
+
+function endTurn(){
+  selected=null;
+  const aAlive=board.flat().some(p=>p&&p.team==="A");
+  const bAlive=board.flat().some(p=>p&&p.team==="B");
+  if(!aAlive||!bAlive){ render();
+    const winner=aAlive?"🔴 Red":"🔵 Blue"; stopMusic(); SFX.win();
+    document.getElementById("turnBanner").innerHTML=`<span class="winner">🏆 ${winner} team WINS! 🏆</span>`;
+    setLog("Tap Change Teams to play again!");
+    document.querySelectorAll(".cell").forEach(c=>c.onclick=null); return; }
+  turn=turn==="A"?"B":"A";
+  const b=document.getElementById("turnBanner");
+  b.className="turn-banner "+(turn==="A"?"turn-a":"turn-b");
+  b.textContent=turn==="A"?"🔴 Red team's turn":"🔵 Blue team's turn";
+  render();
+}
+function setLog(t){ document.getElementById("log").textContent=t; }
+
+resetBuilder();
+</script>
 </body>
 </html>
